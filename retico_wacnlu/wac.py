@@ -15,7 +15,7 @@ import logging
 
 class WAC:
     
-    def __init__(self,wac_dir,classifier_spec=(linear_model.LogisticRegression,{'penalty':'l2'}),compose_method='prod'):
+    def __init__(self,wac_dir,classifier_spec=(linear_model.LogisticRegression,{'penalty':'l2', 'max_iter': 300}),compose_method='prod'):
         '''
         wac_dir: name of model for persistance and loading
         compose_method: prod, avg, sum
@@ -36,7 +36,7 @@ class WAC:
         self.utt_words = []
         self.compose_method = compose_method
         self.classifier_spec = classifier_spec
-        self.max_obvs = 20
+        self.max_obvs = 50
 
     def copy(self):
         new_wac = WAC(self.model_name, self.classifier_spec, self.compose_method)
@@ -93,6 +93,7 @@ class WAC:
 
         self.wac = {}
         for word in self.positives:
+            print(f"Processing word: {word}")
             l = len(self.positives[word])
             if l > self.max_obvs:
                 self.wac[word] = random.sample(self.positives[word], self.max_obvs)
@@ -118,8 +119,8 @@ class WAC:
             if len(self.wac[word]) < min_obs: continue
             this_classf = classifier(**classf_params)
             X,y = zip(*self.wac[word])
-            X = np.array(X).squeeze()
-            # print(word, X.shape)
+            X = np.array(X)
+            print(X.shape)
             # nsamples, nx, ny = X.shape
             # X = X.reshape((nsamples,nx*ny))
             # X = tuple(X)
@@ -218,14 +219,10 @@ class WAC:
     def proba(self, word, context): #use for apply, dummy id
         intents,feats = context
         if word not in self.trained_wac: return None # todo: return a distribution of all zeros?
-        featsArray = np.array(feats) # .squeeze().reshape(1, -1)
-        if len(featsArray.shape) > 2: featsArray = featsArray.squeeze()
-        if len(featsArray.shape) < 2: featsArray = featsArray.reshape(1, -1)
-        # print('feats array shape', featsArray.shape)
+        featsArray = np.array(feats)
         # nsamples, nx, ny = featsArray.shape
         # featsArray = featsArray.reshape((nsamples,nx*ny))
         predictions = list(zip(intents,self.trained_wac[word].predict_proba(featsArray)[:,1]))
-        if len(predictions) > 1: print('Predictions:', predictions)
         return predictions
 
     def get_current_prediction_state(self):
