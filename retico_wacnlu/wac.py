@@ -87,7 +87,7 @@ class WAC:
         for f,p in zip(features,labels):
             self.add_observation(word, f, p)
 
-    def create_negatives(self, num_negs=3):
+    def create_negatives(self, num_negs=3): # Also builds out wac dictionary containing positives and negatives for training (label differentiates)
         if len(self.positives) <= 1: return # need at least two words to find negs
         # self.wac = copy.deepcopy(self.positives) # copy the positives
 
@@ -95,21 +95,36 @@ class WAC:
         for word in self.positives:
             print(f"Processing word: {word}")
             l = len(self.positives[word])
-            if l > self.max_obvs:
+            if l > self.max_obvs: # TODO: should this be sample with replacement or without? I think current is with replacement
                 self.wac[word] = random.sample(self.positives[word], self.max_obvs)
             else:
                 self.wac[word] = copy.deepcopy(self.positives[word])
+            # print(f"{word} positives {self.wac[word]}")
 
+
+        # add negative observations. negative observations are any observations from another word
+        words = list(self.wac.keys())
         for word in self.wac:
             negs = []
             max_len = len(self.wac[word]) * num_negs
+            print(f"For word {word};")
+            random.shuffle(words) # Shuffle all possible words so we don't only sample from beginning of dict
             while len(negs) < max_len:
-                for iword in self.wac:
-                    if iword == word: continue
-                    i = random.sample(self.wac[iword],1)[0]
+                for neg_word in words:
+                    if neg_word == word: continue
+                    # skip using categories where all the features are the same. TBD how helpful this is.
+                    # added for work with IAC where uniform categories were all whitespace.
+                    # many categories contain whitespace observations still, so odds are that whitespace will still
+                    # be used as a negative).
+                    if len(set(np.mean([category[0] for category in self.wac[neg_word] if category[1] == 1], axis=1))) == 1:
+                        print(f"\tSkipping sampling negatives from whitespace-only category {neg_word}")
+                        continue
+
+                    i = random.sample([feature for feature in self.wac[neg_word] if feature[1] == 1],1)[0]
+                    print(f"\tSampling from category {neg_word} observation: {i[0][:5]}...")
                     negs.append(i[0])
             for i in negs:
-                self.add_observation(word, i, 0)
+                self.add_observation(word, i, 0) # label is hard coded to 0 for negs
 
     def train(self, min_obs=2):
         classifier, classf_params = self.classifier_spec
